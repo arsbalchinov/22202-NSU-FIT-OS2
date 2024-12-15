@@ -23,18 +23,18 @@ queue_t* queue_init(int max_count) {
 		printf("Cannot allocate memory for a queue\n");
 		abort();
 	}
-	if (pthread_mutex_init(&q->lock, NULL) != 0) {
-		printf("Error: mutex init!\n");
-		abort();
-	}
 	if (sem_init(&q->full, PTHREAD_PROCESS_PRIVATE, 0) != 0) {
-		printf("Error: sem init!\n");
+		printf("Error: sem init (full)!\n");
 		abort();
 	}
 	if (sem_init(&q->empty, PTHREAD_PROCESS_PRIVATE, max_count) != 0) {
-        printf("Error: sem init!\n");
+        printf("Error: sem init (empty)!\n");
         abort();
     }
+	if (sem_init(&q->lock, PTHREAD_PROCESS_PRIVATE, 1) != 0) {
+		printf("Error: sem init (lock)!\n");
+		abort();
+	}
 
 	q->first = NULL;
 	q->last = NULL;
@@ -56,10 +56,9 @@ void queue_destroy(queue_t *q) {
 	pthread_cancel(q->qmonitor_tid);
     pthread_join(q->qmonitor_tid, NULL);
 
-	pthread_mutex_lock(&q->lock);
-
 	sem_destroy(&q->full);
 	sem_destroy(&q->empty);
+	sem_destroy(&q->lock);
 
 	while (q->first != NULL) {
 		qnode_t* tmp = q->first;
@@ -67,25 +66,21 @@ void queue_destroy(queue_t *q) {
 		free(tmp);
 	}
 
-	pthread_mutex_unlock(&q->lock);
-	pthread_mutex_destroy(&q->lock);
-
 	free(q);
 }
 
 int queue_add(queue_t *q, int val) {
+	sem_wait(&q->empty);
+
 	q->add_attempts++;
 	assert(q->count <= q->max_count);
-
-	sem_wait(&q->empty);
-	pthread_mutex_lock(&q->lock);
 
 	qnode_t *new = malloc(sizeof(qnode_t));
 	if (!new) {
 		printf("Cannot allocate memory for new node\n");
-		pthread_mutex_unlock(&q->lock);
 		abort();
 	}
+	sem_wait(&q->lock);
 
 	new->val = val;
 	new->next = NULL;
@@ -100,17 +95,18 @@ int queue_add(queue_t *q, int val) {
 	q->count++;
 	q->add_count++;
 
+	sem_post(&q->lock);
 	sem_post(&q->full);
-	pthread_mutex_unlock(&q->lock);
 	return 1;
 }
 
 int queue_get(queue_t *q, int *val) {
+	sem_wait(&q->full);
+
 	q->get_attempts++;
 	assert(q->count >= 0);
 
-	sem_wait(&q->full);
-	pthread_mutex_lock(&q->lock);
+	sem_wait(&q->lock);
 
 	qnode_t *tmp = q->first;
 
@@ -121,8 +117,8 @@ int queue_get(queue_t *q, int *val) {
 	q->count--;
 	q->get_count++;
 
+	sem_post(&q->lock);
 	sem_post(&q->empty);
-	pthread_mutex_unlock(&q->lock);
 	return 1;
 }
 

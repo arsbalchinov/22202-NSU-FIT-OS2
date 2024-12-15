@@ -61,10 +61,10 @@ void queue_destroy(queue_t *q) {
 }
 
 int queue_add(queue_t *q, int val) {
+	pthread_mutex_lock(&q->lock);
+
 	q->add_attempts++;
 	assert(q->count <= q->max_count);
-
-	pthread_mutex_lock(&q->lock);
 
 	if (q->count == q->max_count) {
 		pthread_mutex_unlock(&q->lock);
@@ -96,10 +96,10 @@ int queue_add(queue_t *q, int val) {
 }
 
 int queue_get(queue_t *q, int *val) {
+	pthread_mutex_lock(&q->lock);
+
 	q->get_attempts++;
 	assert(q->count >= 0);
-
-	pthread_mutex_lock(&q->lock);
 
 	if (q->count == 0) {
 		pthread_mutex_unlock(&q->lock);
