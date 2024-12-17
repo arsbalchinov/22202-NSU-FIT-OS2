@@ -67,8 +67,13 @@ int file_copy(const char *src, const char *dst) {
 		return -1;
 	}
 
-	while ((dst_fd = open(dst, O_WRONLY | O_CREAT | O_TRUNC, statf.st_mode)) == EMFILE) {
-		usleep(1);
+	while ((dst_fd = open(dst, O_WRONLY | O_CREAT | O_TRUNC, statf.st_mode)) == -1) {
+	    if (errno == EMFILE) {
+	        usleep(1);
+	        continue;
+	    }
+	    perror("Error opening destination file");
+	    return -1;
 	}
 
 	while((bytes_read = read(src_fd, buffer, BUFFER_SIZE)) > 0) {
