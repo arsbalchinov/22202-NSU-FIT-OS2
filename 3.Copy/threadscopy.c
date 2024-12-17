@@ -73,6 +73,7 @@ int file_copy(const char *src, const char *dst) {
 	        continue;
 	    }
 	    perror("Error opening destination file");
+	    close(src_fd);
 	    return -1;
 	}
 
