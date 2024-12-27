@@ -109,14 +109,18 @@ int file_copy(const char *src, const char *dst) {
 	}
 
 	while ((bytes_read = read(src_fd, buffer, BUFFER_SIZE)) > 0) {
+		int total_written = 0;
+		while (total_written < bytes_read) {
 
-		bytes_written = write(dst_fd, buffer, bytes_read);
+			bytes_written = write(dst_fd, buffer + total_written, bytes_read - total_written);
 
-		if (bytes_written != bytes_read) {
-			perror("Error writing file");
-			close(src_fd);
-			close(dst_fd);
-			return -1;
+			if (bytes_written == -1) {
+				perror("Error writing file");
+				close(src_fd);
+				close(dst_fd);
+				return -1;
+			}
+			total_written += bytes_written;
 		}
 	}
 
@@ -151,7 +155,7 @@ int dir_copy(const char *src, const char *dst) {
 		return -1;
 	}
 
-	if (mkdir(dst, statbuf.st_mode) != 0) {
+	if (mkdir(dst, 0777) != 0) {
 		perror("Create directory error");
 		closedir(directory);
 		return -1;
@@ -260,6 +264,7 @@ int dir_copy(const char *src, const char *dst) {
 	free(entry);
 	closedir(directory);
 	pthread_attr_destroy(&attr);
+	chmod(dst, statbuf.st_mode);
 	return 0;
 }
 
